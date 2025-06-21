@@ -1,197 +1,121 @@
-import 'package:ether_app/screens/login_screen.dart';
-import 'package:ether_app/screens/add_story_screen.dart';
 import 'package:flutter/material.dart';
-import 'saves_screen.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:provider/provider.dart';
+import 'dart:io';
+import '../models/post.dart';
+import '../models/user.dart';
+import '../providers/post_provider.dart';
+import '../providers/story_provider.dart';
+import '../models/story.dart';
+import 'login_screen.dart';
 import 'friends_screen.dart';
 import 'notification_screen.dart';
 import 'search_screen.dart';
-import 'language_screen.dart';
-import 'matching_screen.dart';
-import 'package:image_picker/image_picker.dart';
-import 'dart:io';
-import 'package:ether_app/screens/story_viewer_screen.dart';
-import '../data/post_service.dart';
-
-
-
-class Story {
-  final String imagePath;
-  final String? text;
-  Story({required this.imagePath, this.text});
-}
-
-class UserStory {
-  final String userImage;
-  final String username;
-  final List<Story> stories;
-  UserStory({required this.userImage, required this.username, required this.stories});
-}
-
-List<UserStory> userStories = [
-  UserStory(
-    userImage: 'assets/user2.png',
-    username: 'Ahmed',
-    stories: [Story(imagePath: 'assets/post1.jpg', text: 'Enjoying a sunny day!')],
-  ),
-  UserStory(
-    userImage: 'assets/user3.png',
-    username: 'Feky',
-    stories: [Story(imagePath: 'assets/post2.jpg')],
-  ),
-  UserStory(
-    userImage: 'assets/user4.png',
-    username: 'Sheta',
-    stories: [Story(imagePath: 'assets/post3.jpg')],
-  ),
-];
-
-class Post {
-  final String id;
-  final String username;
-  final String userHandle;
-  final String userImage;
-  final String postImage;
-  final String text;
-  List<Comment> comments;
-  int likes;
-  bool isLiked;
-  bool isSaved;
-
-  Post({
-    required this.id,
-    required this.username,
-    required this.userHandle,
-    required this.userImage,
-    required this.postImage,
-    required this.text,
-    List<Comment>? comments,
-    this.likes = 0,
-    this.isLiked = false,
-    this.isSaved = false,
-  }) : this.comments = comments ?? [];
-}
-
-class Comment {
-  final String id;
-  final String username;
-  final String userImage;
-  final String text;
-  final List<Reply> replies;
-  final DateTime timestamp;
-
-  Comment({
-    required this.username,
-    required this.userImage,
-    required this.text,
-    String? id,
-    List<Reply>? replies,
-    DateTime? timestamp,
-  }) : 
-    this.id = id ?? DateTime.now().millisecondsSinceEpoch.toString(),
-    this.replies = replies ?? [],
-    this.timestamp = timestamp ?? DateTime.now();
-    
-  // Ensure replies is never null
-  List<Reply> get safeReplies => replies;
-}
-
-class Reply {
-  final String id;
-  final String username;
-  final String userImage;
-  final String text;
-  final DateTime timestamp;
-  final String replyingTo;
-
-  Reply({
-    required this.username,
-    required this.userImage,
-    required this.text,
-    required this.replyingTo,
-    String? id,
-    DateTime? timestamp,
-  }) : 
-    this.id = id ?? DateTime.now().millisecondsSinceEpoch.toString(),
-    this.timestamp = timestamp ?? DateTime.now();
-}
-
-// Global lists to store posts and saved posts for access across the app
-List<Post> posts = [
-  Post(
-    id: '1',
-    username: 'Ahmed',
-    userHandle: '@Ahmed',
-    userImage: 'assets/user2.png',
-    postImage: 'assets/post1.jpg',
-    text: 'Enjoying a sunny day at the park!',
-    comments: [
-      Comment(username: 'Feky', userImage: 'assets/user3.png', text: 'Nice!'),
-      Comment(username: 'Sheta', userImage: 'assets/user4.png', text: 'Looks fun!'),
-      Comment(username: 'Ahmed', userImage: 'assets/user2.png', text: 'Great photo!'),
-    ],
-    likes: 12,
-  ),
-  Post(
-    id: '2',
-    username: 'Feky',
-    userHandle: '@Feky',
-    userImage: 'assets/user3.png',
-    postImage: 'assets/post2.jpg',
-    text: 'Check out this amazing sunset.',
-    comments: [
-      Comment(username: 'Ahmed', userImage: 'assets/user2.png', text: 'Wow!'),
-      Comment(username: 'Sheta', userImage: 'assets/user4.png', text: 'Beautiful!'),
-      Comment(username: 'Feky', userImage: 'assets/user3.png', text: 'Love this!'),
-    ],
-    likes: 8,
-  ),
-  Post(
-    id: '3',
-    username: 'Sheta',
-    userHandle: '@Sheta',
-    userImage: 'assets/user4.png',
-    postImage: 'assets/post3.jpg',
-    text: 'Birthday party vibes 🎉',
-    comments: [
-      Comment(username: 'Ahmed', userImage: 'assets/user2.png', text: 'Happy Birthday!'),
-      Comment(username: 'Feky', userImage: 'assets/user3.png', text: 'Party time!'),
-      Comment(username: 'Sheta', userImage: 'assets/user4.png', text: '🎂🎈'),
-    ],
-    likes: 20,
-  ),
-];
-
-List<Post> savedPosts = [];
+import 'story_viewer_screen.dart';
+import 'profile_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
   
   // Static user bio that can be updated from other screens
-  static String userBio = "Hi, I'm Ahmed! I love technology, gaming, and making new friends. Always looking for new adventures and connections.";
+  static String userBio = ""; // Will be set from user's bio in API
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  // Get instance of PostService for comment synchronization
-  final PostService _postService = PostService();
   int _selectedIndex = 0;
   final PageController _pageController = PageController();
   final GlobalKey<ScaffoldState> scaffoldKey = GlobalKey<ScaffoldState>();
-
-  // Using the global posts list instead of a class member
-
   final Map<String, TextEditingController> _commentControllers = {};
   final Map<String, TextEditingController> _replyControllers = {};
-  
-  // Access user bio from the static field
-  
-  final Color primaryPurple = const Color.fromRGBO(148, 15, 252, 1);
-
-  File? selectedImage;
+  final ScrollController _scrollController = ScrollController();
+  String? _expandedPostId; // Use post ID instead of index
+  File? selectedPostImage;
   final TextEditingController postController = TextEditingController();
+  
+  // State management through Provider
+  late final StoryProvider storyProvider;
+  late final PostProvider postProvider;
+  late final Color primaryPurple;
 
+  @override
+  void initState() {
+    super.initState();
+    storyProvider = Provider.of<StoryProvider>(context, listen: false);
+    postProvider = Provider.of<PostProvider>(context, listen: false);
+    primaryPurple = Provider.of<AuthProvider>(context, listen: false).appConfig?.primaryColor ?? const Color.fromRGBO(148, 15, 252, 1);
+    
+    _loadInitialPosts();
+    _loadInitialStories();
+  }
+  
+
+
+  Future<void> _loadInitialStories() async {
+    final storyProvider = Provider.of<StoryProvider>(context, listen: false);
+    await storyProvider.loadStories(refresh: true);
+  }
+
+  Future<void> _loadMoreStories() async {
+    if (storyProvider.isLoading) return;
+    
+    try {
+      await storyProvider.loadStories();
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Failed to load more stories'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+    } catch (e) {
+      setState(() {
+        _isStoriesLoading = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Failed to load more stories'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+  
+  Future<void> _loadInitialPosts() async {
+    final postProvider = Provider.of<PostProvider>(context, listen: false);
+    await postProvider.loadPosts(refresh: true);
+  }
+  
+  Future<void> _loadMorePosts() async {
+    if (postProvider.isLoading) return;
+    
+    try {
+      await postProvider.loadPosts();
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Failed to load more posts'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+      });
+      // Show error message
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Failed to load more posts'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+  
   void _onNavTap(int index) {
     setState(() {
       _selectedIndex = index;
@@ -217,123 +141,99 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      key: scaffoldKey,
-      backgroundColor: Colors.white,
-      appBar: AppBar(
-        automaticallyImplyLeading: false,
-        backgroundColor: Colors.white,
-        elevation: 0,
-        titleSpacing: 0,
-        title: Center(
-          child: Image.asset(
-            'assets/logo.png',
-            height: 150,
-            width: 150,
+    return Consumer<PostProvider>(
+      builder: (context, postProvider, child) {
+        return Scaffold(
+          backgroundColor: Colors.white,
+          appBar: AppBar(
+            automaticallyImplyLeading: false,
+            backgroundColor: Colors.white,
+            elevation: 0,
+            titleSpacing: 0,
+            title: Center(
+              child: Image.network(
+                AuthProvider(context).appConfig?.logoUrl ?? '',
+                height: 150,
+                width: 150,
+              ),
+            ),
+            actions: [
+              IconButton(
+                icon: const Icon(Icons.notifications_none, size: 28),
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => const NotificationScreen()),
+                  );
+                },
+              ),
+            ],
           ),
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.notifications_none, size: 28),
-            color: primaryPurple,
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const NotificationScreen()),
-              );
+          body: PageView(
+            controller: _pageController,
+            onPageChanged: (index) {
+              setState(() {
+                _selectedIndex = index;
+              });
             },
-          ),
-        ],
-        leading: IconButton(
-          icon: Icon(Icons.menu, size: 30, color: primaryPurple),
-          onPressed: () {
-            scaffoldKey.currentState?.openDrawer();
-          },
-        ),
-      ),
-      drawer: Drawer(
-        child: ListView(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          children: [
-            const SizedBox(height: 40),
-            CircleAvatar(
-              radius: 70,
-              backgroundColor: Colors.grey[200],
-              child: ClipOval(
-                child: Image.asset(
-                  'assets/user2.png',
-                  width: 140,
-                  height: 140,
-                  fit: BoxFit.cover,
-                ),
-              ),
-            ),
-            const SizedBox(height: 8),
-            const Center(
-              child: Text('@Ahmed', style: TextStyle(fontSize: 14, color: Colors.grey)),
-            ),
-            const SizedBox(height: 20),
-            ..._buildDrawerItemList(primaryPurple),
-          ],
-        ),
-      ),
-      body: PageView(
-        controller: _pageController,
-        physics: const NeverScrollableScrollPhysics(),
-        children: [
-          _buildHomeFeed(),
-          _buildCreatePostSection(),
-          const Center(child: Text("Search Page", style: TextStyle(fontSize: 22))),
-          _buildProfilePage(),
-        ],
-      ),
-
-      bottomNavigationBar: Padding(
-        padding: const EdgeInsets.only(left: 24, right: 24, bottom: 24),
-        child: Container(
-          height: 70,
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(30),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black12,
-                blurRadius: 20,
-                offset: Offset(0, 8),
-              ),
-            ],
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
-              _modernNavIcon(index: 0, icon: Icons.home_rounded, label: 'Home'),
-              _modernNavIcon(index: 1, icon: Icons.add_box_rounded, label: 'Post'),
-              _modernNavIcon(index: 3, icon: Icons.person_rounded, label: 'Profile'),
+              _buildHomeScreen(postProvider),
+              const SearchScreen(),
+              const StoryViewerScreen(),
+              const FriendsScreen(),
+              const ProfileScreen(),
             ],
           ),
-        ),
-      ),
+          bottomNavigationBar: Padding(
+            padding: const EdgeInsets.only(left: 24, right: 24, bottom: 24),
+            child: Container(
+              height: 70,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(30),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black12,
+                    blurRadius: 20,
+                    offset: const Offset(0, 8),
+                  ),
+                ],
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                children: [
+                  _modernNavIcon(index: 0, icon: Icons.home_rounded, label: 'Home'),
+                  _modernNavIcon(index: 1, icon: Icons.search_rounded, label: 'Search'),
+                  _modernNavIcon(index: 2, icon: Icons.add_box_rounded, label: 'Create'),
+                  _modernNavIcon(index: 3, icon: Icons.people_alt_rounded, label: 'Friends'),
+                  _modernNavIcon(index: 4, icon: Icons.person_rounded, label: 'Profile'),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 
-  Widget _buildHomeFeed() {
+  Widget _buildHomeScreen(PostProvider postProvider) {
+    if (postProvider.isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (postProvider.error != null) {
+      return Center(
+        child: Text('Error: ${postProvider.error}'),
+      );
+    }
+
     return RefreshIndicator(
       color: primaryPurple,
       backgroundColor: Colors.white,
       strokeWidth: 3,
       displacement: 50,
       onRefresh: () async {
-        // Simulate a network request
-        await Future.delayed(const Duration(milliseconds: 1500));
-        
-        // Update the UI
-        setState(() {
-          // Shuffle the order of posts to simulate new content
-          final tempPosts = List<Post>.from(posts);
-          tempPosts.shuffle();
-          posts.clear();
-          posts.addAll(tempPosts);
-        });
+        await postProvider.loadPosts(refresh: true);
       },
       child: CustomScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
@@ -347,20 +247,15 @@ class _HomeScreenState extends State<HomeScreen> {
             expandedHeight: 120,
             toolbarHeight: 0,
             flexibleSpace: FlexibleSpaceBar(
-              background: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black12,
-                      blurRadius: 4,
-                      offset: Offset(0, 2),
-                    ),
-                  ],
+              title: Text(
+                'Stories',
+                style: TextStyle(
+                  color: Colors.black,
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
                 ),
-                child: _buildStoriesSection(primaryPurple),
               ),
+              titlePadding: EdgeInsets.only(left: 16, bottom: 16),
             ),
           ),
           SliverList(
@@ -368,10 +263,10 @@ class _HomeScreenState extends State<HomeScreen> {
               (context, index) {
                 return Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  child: _buildPostCard(index),
+                  child: _buildPostCard(postProvider.posts[index]),
                 );
               },
-              childCount: posts.length,
+              childCount: postProvider.posts.length,
             ),
           ),
         ],
@@ -379,8 +274,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildPostCard(int postIndex) {
-    final post = posts[postIndex];
+  Widget _buildPostCard(Post post) {
     _commentControllers.putIfAbsent(post.id, () => TextEditingController());
     return Container(
       decoration: BoxDecoration(
@@ -408,21 +302,21 @@ class _HomeScreenState extends State<HomeScreen> {
                       children: [
                         CircleAvatar(
                           radius: 22,
-                          backgroundImage: AssetImage(post.userImage),
+                          backgroundImage: NetworkImage(post.user.profilePictureUrl ?? ''),
                         ),
                         const SizedBox(width: 12),
                         Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              post.username,
+                              post.user.username,
                               style: const TextStyle(
                                 fontWeight: FontWeight.bold,
                                 fontSize: 16,
                               ),
                             ),
                             Text(
-                              post.userHandle,
+                              '@${post.user.username}',
                               style: const TextStyle(
                                 fontSize: 14,
                                 color: Colors.grey,
@@ -432,27 +326,23 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                       ],
                     ),
-                    if (post.username == 'Ahmed')
+                    if (post.user.id?.isNotEmpty == true && post.user.id == AuthProvider(context).currentUser?.id)
                       IconButton(
                         icon: Icon(Icons.more_vert, color: Colors.grey),
-                        onPressed: () {
-                          showDialog(
+                        onPressed: () async {
+                          final result = await showDialog<bool>(
                             context: context,
                             builder: (context) => AlertDialog(
                               title: const Text('Delete Post'),
                               content: const Text('Are you sure you want to delete this post?'),
                               actions: [
                                 TextButton(
-                                  onPressed: () => Navigator.pop(context),
+                                  onPressed: () => Navigator.pop(context, false),
                                   child: const Text('Cancel'),
                                 ),
                                 TextButton(
                                   onPressed: () {
-                                    setState(() {
-                                      posts.removeAt(postIndex);
-                                      savedPosts.removeWhere((p) => p.id == post.id);
-                                    });
-                                    Navigator.pop(context);
+                                    Navigator.pop(context, true);
                                   },
                                   child: const Text(
                                     'Delete',
@@ -462,31 +352,44 @@ class _HomeScreenState extends State<HomeScreen> {
                               ],
                             ),
                           );
+                          
+                          if (result == true) {
+                            final postProvider = Provider.of<PostProvider>(context, listen: false);
+                            try {
+                              await postProvider.deletePost(post.id);
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Post deleted successfully'),
+                                  backgroundColor: Colors.green,
+                                ),
+                              );
+                            } catch (e) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Failed to delete post'),
+                                  backgroundColor: Colors.red,
+                                ),
+                              );
+                            }
+                          }
                         },
                       ),
                   ],
                 ),
                 const SizedBox(height: 16),
-                if (post.postImage.isNotEmpty)
+                if (post.imageUrl.isNotEmpty)
                   ClipRRect(
                     borderRadius: BorderRadius.circular(16),
-                    child: post.postImage.startsWith('/') || post.postImage.contains('storage')
-                        ? Image.file(
-                            File(post.postImage),
-                            height: 240,
-                            width: double.infinity,
-                            fit: BoxFit.cover,
-                          )
-                        : Image.asset(
-                            post.postImage,
-                            height: 240,
-                            width: double.infinity,
-                            fit: BoxFit.cover,
-                          ),
+                    child: NetworkImage(
+                      post.imageUrl,
+                      height: 240,
+                      width: double.infinity,
+                      fit: BoxFit.cover,
+                    ),
                   ),
                 const SizedBox(height: 16),
                 Text(
-                  post.text,
+                  post.content,
                   style: const TextStyle(fontSize: 16, height: 1.5),
                 ),
               ],
@@ -504,26 +407,31 @@ class _HomeScreenState extends State<HomeScreen> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                _buildLikeButton(postIndex),
-                _buildCommentButton(postIndex),
-                _buildSaveButton(postIndex),
+                _buildLikeButton(post, postProvider),
+                _buildCommentButton(post, postProvider),
+                _buildSaveButton(post, postProvider),
               ],
             ),
           ),
-          if (_expandedPost == postIndex) _buildCommentsSection(postIndex),
+          if (_expandedPostId == post.id) _buildCommentsSection(post.id),
         ],
       ),
     );
   }
 
-  Widget _buildLikeButton(int postIndex) {
-    final post = posts[postIndex];
+  Widget _buildLikeButton(Post post, PostProvider postProvider) {
     return GestureDetector(
-      onTap: () {
-        setState(() {
-          post.isLiked = !post.isLiked;
-          post.likes += post.isLiked ? 1 : -1;
-        });
+      onTap: () async {
+        try {
+          await postProvider.toggleLike(post.id);
+        } catch (e) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Failed to like/unlike post'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
       },
       child: Row(
         children: [
@@ -541,22 +449,21 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
           const SizedBox(width: 4),
-          Text('${post.likes}'),
+          Text('${post.likesCount}'),
         ],
       ),
     );
   }
 
-  Widget _buildCommentButton(int postIndex) {
-    final post = posts[postIndex];
+  Widget _buildCommentButton(Post post, PostProvider postProvider) {
     return GestureDetector(
       onTap: () {
         setState(() {
           // Toggle comments section
-          if (_expandedPost == postIndex) {
+          if (_expandedPost == post.id) {
             _expandedPost = null;
           } else {
-            _expandedPost = postIndex;
+            _expandedPost = post.id;
           }
         });
       },
@@ -565,8 +472,8 @@ class _HomeScreenState extends State<HomeScreen> {
           Icon(
             Icons.mode_comment_rounded,
             size: 22,
-            color: _expandedPost == postIndex ? primaryPurple : Colors.grey,
-            shadows: _expandedPost == postIndex
+            color: _expandedPost == post.id ? primaryPurple : Colors.grey,
+            shadows: _expandedPost == post.id
                 ? [Shadow(color: primaryPurple.withOpacity(0.3), blurRadius: 8)]
                 : [],
           ),
@@ -579,28 +486,24 @@ class _HomeScreenState extends State<HomeScreen> {
 
   int? _expandedPost;
 
-  Widget _buildSaveButton(int postIndex) {
-    final post = posts[postIndex];
+  Widget _buildSaveButton(Post post, PostProvider postProvider) {
     return GestureDetector(
-      onTap: () {
-        setState(() {
-          post.isSaved = !post.isSaved;
-          if (post.isSaved) {
-            if (!savedPosts.any((p) => p.id == post.id)) {
-              savedPosts.add(post);
-            }
-          } else {
-            savedPosts.removeWhere((p) => p.id == post.id);
-          }
-        });
+      onTap: () async {
+        try {
+          await postProvider.toggleSave(post.id);
+        } catch (e) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Failed to save/unsave post'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
       },
       child: Icon(
         post.isSaved ? Icons.bookmark_rounded : Icons.bookmark_border_rounded,
         size: 22,
         color: post.isSaved ? primaryPurple : Colors.grey,
-        shadows: post.isSaved
-            ? [Shadow(color: primaryPurple.withOpacity(0.3), blurRadius: 8)]
-            : [],
       ),
     );
   }
@@ -608,9 +511,9 @@ class _HomeScreenState extends State<HomeScreen> {
   // Track which comment we're replying to
   String? _replyingToCommentId;
   
-  Widget _buildCommentsSection(int postIndex) {
-    if (_expandedPost != postIndex) return const SizedBox.shrink();
-    final post = posts[postIndex];
+  Widget _buildCommentsSection(String postId) {
+    if (_expandedPostId != postId) return const SizedBox.shrink();
+    final post = Provider.of<PostProvider>(context, listen: false).posts.firstWhere((p) => p.id == postId);
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -669,7 +572,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           children: [
                             CircleAvatar(
                               radius: 20,
-                              backgroundImage: AssetImage(c.userImage),
+                              backgroundImage: NetworkImage(c.user.profilePictureUrl ?? ''),
                             ),
                             const SizedBox(width: 12),
                             Expanded(
@@ -680,7 +583,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                     children: [
                                       Text(
-                                        c.username,
+                                        c.user.username,
                                         style: const TextStyle(
                                           fontWeight: FontWeight.bold,
                                           fontSize: 14,
@@ -708,25 +611,36 @@ class _HomeScreenState extends State<HomeScreen> {
                                           setState(() {
                                             if (_replyingToCommentId == c.id) {
                                               _replyingToCommentId = null;
+                                              _replyControllers[c.id]?.clear();
                                             } else {
                                               _replyingToCommentId = c.id;
                                               _replyControllers.putIfAbsent(c.id, () => TextEditingController());
                                             }
                                           });
                                         },
-                                        child: Text(
-                                          _replyingToCommentId == c.id ? 'Cancel' : 'Reply',
-                                          style: TextStyle(
-                                            color: primaryPurple,
-                                            fontWeight: FontWeight.w500,
-                                            fontSize: 12,
-                                          ),
+                                        child: Row(
+                                          children: [
+                                            Icon(
+                                              Icons.reply_rounded,
+                                              size: 14,
+                                              color: primaryPurple,
+                                            ),
+                                            const SizedBox(width: 4),
+                                            Text(
+                                              _replyingToCommentId == c.id ? 'Cancel' : 'Reply',
+                                              style: TextStyle(
+                                                color: primaryPurple,
+                                                fontWeight: FontWeight.w500,
+                                                fontSize: 12,
+                                              ),
+                                            ),
+                                          ],
                                         ),
                                       ),
                                       const SizedBox(width: 16),
                                       if (c.safeReplies.isNotEmpty)
                                         Text(
-                                          '${c.safeReplies.length} ${c.safeReplies.length == 1 ? 'reply' : 'replies'}',
+                                          '${c.replies.length} ${c.replies.length == 1 ? 'reply' : 'replies'}',
                                           style: TextStyle(
                                             color: Colors.grey[600],
                                             fontSize: 12,
@@ -738,7 +652,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               ),
                             ),
                             // Add delete icon for the user's own comments
-                            if (c.username == 'Ahmed')
+                            if (c.user.id == AuthProvider(context).currentUser?.id)
                               GestureDetector(
                                 onTap: () {
                                   showDialog(
@@ -752,12 +666,26 @@ class _HomeScreenState extends State<HomeScreen> {
                                           child: const Text('Cancel'),
                                         ),
                                         TextButton(
-                                          onPressed: () {
-                                            setState(() {
-                                              posts[postIndex].comments.remove(c);
-                                              _postService.removeComment(posts[postIndex].id, c);
-                                            });
-                                            Navigator.pop(context);
+                                          onPressed: () async {
+                                            try {
+                                              final postProvider = Provider.of<PostProvider>(context, listen: false);
+                                              await postProvider.deleteComment(post.id, c.id);
+                                              ScaffoldMessenger.of(context).showSnackBar(
+                                                const SnackBar(
+                                                  content: Text('Comment deleted successfully'),
+                                                  backgroundColor: Colors.green,
+                                                ),
+                                              );
+                                            } catch (e) {
+                                              ScaffoldMessenger.of(context).showSnackBar(
+                                                const SnackBar(
+                                                  content: Text('Failed to delete comment'),
+                                                  backgroundColor: Colors.red,
+                                                ),
+                                              );
+                                            } finally {
+                                              Navigator.pop(context);
+                                            }
                                           },
                                           child: const Text(
                                             'Delete',
@@ -796,14 +724,14 @@ class _HomeScreenState extends State<HomeScreen> {
                               children: [
                                 CircleAvatar(
                                   radius: 16,
-                                  backgroundImage: AssetImage('assets/user2.png'),
+                                  backgroundImage: NetworkImage(AuthProvider(context).currentUser?.profilePictureUrl ?? ''),
                                 ),
                                 const SizedBox(width: 8),
                                 Expanded(
                                   child: TextField(
                                     controller: _replyControllers[c.id],
                                     decoration: InputDecoration(
-                                      hintText: 'Reply to ${c.username}...',
+                                      hintText: 'Reply to ${c.user.username}...',
                                       hintStyle: TextStyle(color: Colors.grey[400], fontSize: 13),
                                       contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                                       border: OutlineInputBorder(
@@ -816,7 +744,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                       ),
                                       focusedBorder: OutlineInputBorder(
                                         borderRadius: BorderRadius.circular(16),
-                                        borderSide: BorderSide(color: primaryPurple),
+                                        borderSide: BorderSide(color: AuthProvider(context).appConfig?.primaryColor ?? primaryPurple),
                                       ),
                                     ),
                                   ),
@@ -826,19 +754,19 @@ class _HomeScreenState extends State<HomeScreen> {
                                   onPressed: () {
                                     final text = _replyControllers[c.id]?.text.trim();
                                     if (text != null && text.isNotEmpty) {
-                                      setState(() {
-                                        Reply newReply = Reply(
-                                          username: 'Ahmed',
-                                          userImage: 'assets/user2.png',
-                                          text: text,
-                                          replyingTo: c.username,
-                                        );
-                                        // Add reply and sync with PostService
-                                        c.safeReplies.add(newReply);
-                                        _postService.addReply(post.id, c.id, newReply);
+                                      try {
+                                        final postProvider = Provider.of<PostProvider>(context, listen: false);
+                                        await postProvider.addReply(post.id, c.id, text);
                                         _replyControllers[c.id]?.clear();
                                         _replyingToCommentId = null;
-                                      });
+                                      } catch (e) {
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          SnackBar(
+                                            content: Text('Failed to add reply: $e'),
+                                            backgroundColor: Colors.red,
+                                          ),
+                                        );
+                                      }
                                     }
                                   },
                                 ),
@@ -849,12 +777,12 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                   ),
                   // Display replies with indentation
-                  if (c.safeReplies.isNotEmpty)
+                  if (c.replies.isNotEmpty)
                     Padding(
                       padding: const EdgeInsets.only(left: 32),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
-                        children: c.safeReplies.map((reply) => Container(
+                        children: c.replies.map((reply) => Container(
                           margin: const EdgeInsets.only(bottom: 8),
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
@@ -867,7 +795,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             children: [
                               CircleAvatar(
                                 radius: 16,
-                                backgroundImage: AssetImage(reply.userImage),
+                                backgroundImage: NetworkImage(reply.user.profilePictureUrl ?? ''),
                               ),
                               const SizedBox(width: 8),
                               Expanded(
@@ -900,7 +828,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                                 style: TextStyle(
                                                   fontWeight: FontWeight.w500,
                                                   fontSize: 12,
-                                                  color: primaryPurple,
+                                                  color: AuthProvider(context).appConfig?.primaryColor ?? primaryPurple,
                                                 ),
                                               ),
                                             ],
@@ -924,7 +852,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                 ),
                               ),
                               // Delete option for own replies
-                              if (reply.username == 'Ahmed')
+                              if (reply.username == AuthProvider(context).currentUser?.username)
                                 GestureDetector(
                                   onTap: () {
                                     showDialog(
@@ -938,13 +866,26 @@ class _HomeScreenState extends State<HomeScreen> {
                                             child: const Text('Cancel'),
                                           ),
                                           TextButton(
-                                            onPressed: () {
-                                              setState(() {
-                                                c.replies.remove(reply);
-                                                // Sync with PostService
-                                                _postService.removeReply(post.id, c.id, reply);
-                                              });
-                                              Navigator.pop(context);
+                                            onPressed: () async {
+                                              try {
+                                                final postProvider = Provider.of<PostProvider>(context, listen: false);
+                                                await postProvider.removeReply(post.id, c.id, reply.id);
+                                                ScaffoldMessenger.of(context).showSnackBar(
+                                                  const SnackBar(
+                                                    content: Text('Reply deleted successfully'),
+                                                    backgroundColor: Colors.green,
+                                                  ),
+                                                );
+                                              } catch (e) {
+                                                ScaffoldMessenger.of(context).showSnackBar(
+                                                  const SnackBar(
+                                                    content: Text('Failed to delete reply'),
+                                                    backgroundColor: Colors.red,
+                                                  ),
+                                                );
+                                              } finally {
+                                                Navigator.pop(context);
+                                              }
                                             },
                                             child: const Text(
                                               'Delete',
@@ -994,7 +935,7 @@ class _HomeScreenState extends State<HomeScreen> {
               children: [
                 CircleAvatar(
                   radius: 20,
-                  backgroundImage: AssetImage('assets/user2.png'),
+                  backgroundImage: NetworkImage(AuthProvider(context).currentUser?.profilePictureUrl ?? ''),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -1021,21 +962,21 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
                 IconButton(
                   icon: Icon(Icons.send_rounded, color: primaryPurple),
-                  onPressed: () {
+                  onPressed: () async {
                     final text = _commentControllers[post.id]?.text.trim();
                     if (text != null && text.isNotEmpty) {
-                      setState(() {
-                        Comment newComment = Comment(
-                          username: 'Ahmed',
-                          userImage: 'assets/user2.png',
-                          text: text,
-                        );
-                        posts[postIndex].comments.add(newComment);
-                        // Sync the new comment with PostService
-                        _postService.addComment(posts[postIndex].id, newComment);
-                        // No need to manually sync with savedPosts as PostService handles this
+                      try {
+                        final postProvider = Provider.of<PostProvider>(context, listen: false);
+                        await postProvider.addComment(post.id, text);
                         _commentControllers[post.id]?.clear();
-                      });
+                      } catch (e) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Failed to add comment: $e'),
+                            backgroundColor: Colors.red,
+                          ),
+                        );
+                      }
                     }
                   },
                 ),
@@ -1066,14 +1007,36 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildStoriesSection(Color primaryPurple) {
-    // Assume current user is 'Ahmed' with userImage 'assets/user2.png'
-    final String currentUser = 'Ahmed';
-    final String currentUserImage = 'assets/user2.png';
-    final currentUserStoryIndex = userStories.indexWhere((us) => us.username == currentUser);
-    final hasCurrentUserStory = currentUserStoryIndex != -1 && userStories[currentUserStoryIndex].stories.isNotEmpty;
+    final currentUser = AuthProvider(context).currentUser?.username ?? '';
+    final currentUserImage = AuthProvider(context).currentUser?.profilePictureUrl ?? '';
+    final storyProvider = Provider.of<StoryProvider>(context, listen: true);
+    
+    if (storyProvider.isLoading) {
+      return const SizedBox(
+        height: 120,
+        child: Center(
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
 
-    final otherUsers = userStories.where((us) => us.username != currentUser).toList();
-    int itemCount = 1 + otherUsers.length;
+    if (storyProvider.error != null) {
+      return SizedBox(
+        height: 120,
+        child: Center(
+          child: Text('Error: ${storyProvider.error}'),
+        ),
+      );
+    }
+
+    final currentUserStory = storyProvider.stories.firstWhere(
+      (story) => story.username == currentUser,
+      orElse: () => const Story(username: '', stories: []),
+    );
+    final hasCurrentUserStory = currentUserStory.stories.isNotEmpty;
+
+    final otherUsers = storyProvider.stories.where((story) => story.username != currentUser).toList();
+    final itemCount = 1 + otherUsers.length;
 
     return SizedBox(
       height: 120,
@@ -1093,13 +1056,9 @@ class _HomeScreenState extends State<HomeScreen> {
                     await Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (_) => StoryViewerScreen(
-                          userStories: userStories,
-                          initialUserIndex: currentUserStoryIndex,
-                        ),
+                        builder: (_) => const StoryViewerScreen(),
                       ),
                     );
-                    setState(() {});
                   } : null,
                   child: Column(
                     children: [
@@ -1117,7 +1076,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           child: CircleAvatar(
                             radius: 33,
                             backgroundColor: Colors.grey[300],
-                            backgroundImage: AssetImage(currentUserImage),
+                            backgroundImage: NetworkImage(currentUserImage),
                           ),
                         ),
                       ),
@@ -1138,26 +1097,22 @@ class _HomeScreenState extends State<HomeScreen> {
                   bottom: 20,
                   right: 0,
                   child: GestureDetector(
-                    onTap: () {
-                      Navigator.push(
+                    onTap: () async {
+                      final result = await Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (_) => AddStoryScreen(onStoryAdded: (imagePath, text) {
-                            setState(() {
-                              final idx = userStories.indexWhere((us) => us.username == currentUser);
-                              if (idx == -1) {
-                                userStories.insert(0, UserStory(
-                                  userImage: currentUserImage,
-                                  username: currentUser,
-                                  stories: [Story(imagePath: imagePath, text: text)],
-                                ));
-                              } else {
-                                userStories[idx].stories.add(Story(imagePath: imagePath, text: text));
-                              }
-                            });
-                          }),
+                          builder: (_) => const AddStoryScreen(),
                         ),
                       );
+                      
+                      if (result != null) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Story added successfully'),
+                            backgroundColor: Colors.green,
+                          ),
+                        );
+                      }
                     },
                     child: Container(
                       padding: const EdgeInsets.all(4),
@@ -1190,17 +1145,12 @@ class _HomeScreenState extends State<HomeScreen> {
             return GestureDetector(
               onTap: () async {
                 if (userStory.stories.isNotEmpty) {
-                  final realIndex = userStories.indexWhere((us) => us.username == userStory.username);
                   await Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (_) => StoryViewerScreen(
-                        userStories: userStories,
-                        initialUserIndex: realIndex,
-                      ),
+                      builder: (_) => const StoryViewerScreen(),
                     ),
                   );
-                  setState(() {});
                 }
               },
               child: Column(
@@ -1218,8 +1168,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       backgroundColor: Colors.white,
                       child: CircleAvatar(
                         radius: 33,
-                        backgroundColor: null,
-                        backgroundImage: AssetImage(userStory.userImage),
+                        backgroundImage: NetworkImage(userStory.userImage),
                       ),
                     ),
                   ),
@@ -1545,7 +1494,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   _buildCommentButton(posts.indexOf(post)),
                   Row(
                     children: [
-                      _buildSaveButton(posts.indexOf(post)),
+                      _buildSaveButton(posts.indexOf(post), Provider.of<PostProvider>(context, listen: false)),
                       if (post.username == 'Ahmed')
                         IconButton(
                           icon: Icon(Icons.more_vert, color: Colors.grey),
@@ -1561,12 +1510,19 @@ class _HomeScreenState extends State<HomeScreen> {
                                     child: const Text('Cancel'),
                                   ),
                                   TextButton(
-                                    onPressed: () {
-                                      setState(() {
-                                        posts.removeWhere((p) => p.id == post.id);
-                                        savedPosts.removeWhere((p) => p.id == post.id);
-                                      });
-                                      Navigator.pop(context);
+                                    onPressed: () async {
+                                      try {
+                                        final postProvider = Provider.of<PostProvider>(context, listen: false);
+                                        await postProvider.deletePost(post.id);
+                                        Navigator.pop(context);
+                                      } catch (e) {
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          SnackBar(
+                                            content: Text('Failed to delete post: $e'),
+                                            backgroundColor: Colors.red,
+                                          ),
+                                        );
+                                      }
                                     },
                                     child: const Text(
                                       'Delete',
@@ -1583,7 +1539,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 ],
               ),
             ),
-            if (_expandedPost == posts.indexOf(post)) _buildCommentsSection(posts.indexOf(post)),
+            if (_expandedPostId == post.id) _buildCommentsSection(post.id),
           ],
         ),
       ),
@@ -1591,7 +1547,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildCreatePostSection() {
-    Future<void> pickImage() async {
+    Future<void> _pickImage() async {
       try {
         final ImagePicker picker = ImagePicker();
         final XFile? image = await picker.pickImage(
@@ -1602,7 +1558,7 @@ class _HomeScreenState extends State<HomeScreen> {
         );
         if (image != null) {
           setState(() {
-            selectedImage = File(image.path);
+            selectedPostImage = File(image.path);
           });
         }
       } catch (e) {
@@ -1652,21 +1608,23 @@ class _HomeScreenState extends State<HomeScreen> {
                       children: [
                         CircleAvatar(
                           radius: 20,
-                          backgroundImage: AssetImage('assets/user2.png'),
+                          backgroundImage: NetworkImage(
+                            AuthProvider(context).currentUser?.profilePictureUrl ?? '',
+                          ),
                         ),
                         const SizedBox(width: 12),
-                        const Column(
+                        Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              'Ahmed',
+                              AuthProvider(context).currentUser?.username ?? 'User',
                               style: TextStyle(
                                 fontWeight: FontWeight.bold,
                                 fontSize: 16,
                               ),
                             ),
                             Text(
-                              '@Ahmed',
+                              '@${AuthProvider(context).currentUser?.username ?? 'user'}',
                               style: TextStyle(
                                 fontSize: 14,
                                 color: Colors.grey,
@@ -1697,7 +1655,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                     ),
                     const SizedBox(height: 16),
-                    if (selectedImage != null)
+                    if (selectedPostImage != null)
                       Stack(
                         children: [
                           ClipRRect(
@@ -1715,7 +1673,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             child: GestureDetector(
                               onTap: () {
                                 setState(() {
-                                  selectedImage = null;
+                                  selectedPostImage = null;
                                 });
                               },
                               child: Container(
@@ -1761,28 +1719,26 @@ class _HomeScreenState extends State<HomeScreen> {
                         ElevatedButton(
                           onPressed: () {
                             if (postController.text.isNotEmpty) {
-                              final String newPostId = DateTime.now().millisecondsSinceEpoch.toString();
-                              setState(() {
-                                // Create a new post with an empty comments list
-                                Post newPost = Post(
-                                  id: newPostId,
-                                  username: 'Ahmed',
-                                  userHandle: '@Ahmed',
-                                  userImage: 'assets/user2.png',
-                                  postImage: selectedImage != null ? selectedImage!.path : '',
-                                  text: postController.text,
-                                  comments: [], // Initialize with an empty list
-                                );
-                                
-                                // Add the post to the beginning of the list
-                                posts.insert(0, newPost);
-                                
-                                // Initialize the comment controller for the new post
-                                _commentControllers[newPostId] = TextEditingController();
-                                
-                                postController.clear();
-                                selectedImage = null;
-                                _pageController.jumpToPage(0);
+                              final postProvider = Provider.of<PostProvider>(context, listen: false);
+                              postProvider.createPost(
+                                postController.text,
+                                imageUrls: selectedPostImage != null ? [selectedPostImage!.path] : null,
+                              ).then((success) {
+                                if (success) {
+                                  postController.clear();
+                                  setState(() {
+                                    postImage = null;
+                                  });
+                                  _pageController.jumpToPage(0);
+                                } else {
+                                  // Show error message if post creation fails
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text('Failed to create post'),
+                                      backgroundColor: Colors.red,
+                                    ),
+                                  );
+                                }
                               });
                             }
                           },

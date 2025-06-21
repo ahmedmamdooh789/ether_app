@@ -1,16 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:injectable/injectable.dart';
 
-class LanguageService {
-  // Singleton pattern implementation
-  static final LanguageService _instance = LanguageService._internal();
-  
-  factory LanguageService() {
-    return _instance;
-  }
-  
-  LanguageService._internal();
-  
+@Injectable()
+class LanguageService extends ChangeNotifier {
   // Current locale
   Locale _currentLocale = const Locale('en', 'US');
   
@@ -43,11 +36,23 @@ class LanguageService {
         _currentLocale = const Locale('en', 'US');
       }
     }
+    
+    notifyListeners();
   }
   
   // Change language
   Future<void> changeLanguage(String languageCode) async {
     final prefs = await SharedPreferences.getInstance();
+    
+    if (languageCode == 'ar') {
+      _currentLocale = const Locale('ar', 'EG');
+      await prefs.setString('language_code', 'ar');
+    } else {
+      _currentLocale = const Locale('en', 'US');
+      await prefs.setString('language_code', 'en');
+    }
+    
+    notifyListeners();
     await prefs.setString('language_code', languageCode);
     
     if (languageCode == 'ar') {

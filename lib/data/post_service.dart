@@ -1,87 +1,190 @@
-import '../screens/home_screen.dart' as home_screen;
+import 'package:dio/dio.dart';
+import 'package:injectable/injectable.dart';
+import '../models/post.dart';
+import '../models/comment.dart';
+import '../utils/api_error_handler.dart';
+import '../config/environment.dart';
 
-// Import the Comment class directly to avoid using home_screen.Comment
-import '../screens/home_screen.dart' show Comment, Post;
-
-/// A service class to manage posts and synchronize comments across different screens.
+@injectable
 class PostService {
-  // Singleton pattern implementation
-  static final PostService _instance = PostService._internal();
-  
-  factory PostService() {
-    return _instance;
-  }
-  
-  PostService._internal();
-  
-  /// Adds a comment to a post and syncs it across both the main posts list and saved posts list.
-  void addComment(String postId, Comment comment) {
-    // Sync with saved posts if this post is saved
-    final savedPostIndex = home_screen.savedPosts.indexWhere((p) => p.id == postId);
-    if (savedPostIndex != -1) {
-      // Check if the comment is already in the saved post
-      final commentExists = home_screen.savedPosts[savedPostIndex].comments.any(
-        (c) => c.username == comment.username && c.text == comment.text
+  final Dio _dio;
+
+  PostService(this._dio);
+
+  /// Creates a new post
+  Future<Post> createPost({
+    required String content,
+    List<String>? mediaUrls,
+  }) async {
+    try {
+      final response = await _dio.post(
+        '/posts',
+        data: {
+          'content': content,
+          if (mediaUrls != null && mediaUrls.isNotEmpty) 'media': mediaUrls,
+        },
       );
-      
-      if (!commentExists) {
-        home_screen.savedPosts[savedPostIndex].comments.add(comment);
-      }
-    }
-    
-    // No need to sync with main posts list as the comment is already added there
-    // by the calling code in home_screen.dart
-  }
-  
-  /// Removes a comment from a post and syncs the removal across both lists.
-  void removeComment(String postId, Comment comment) {
-    // Sync with saved posts if this post is saved
-    final savedPostIndex = home_screen.savedPosts.indexWhere((p) => p.id == postId);
-    if (savedPostIndex != -1) {
-      home_screen.savedPosts[savedPostIndex].comments.removeWhere(
-        (c) => c.username == comment.username && c.text == comment.text
-      );
-    }
-    
-    // No need to sync with main posts list as the comment is already removed there
-    // by the calling code in home_screen.dart
-  }
-  
-  /// Gets a post by its ID from either the main posts list or saved posts list.
-  Post? getPostById(String postId) {
-    // First check in the main posts list
-    for (var post in home_screen.posts) {
-      if (post.id == postId) {
-        return post;
-      }
-    }
-    
-    // Then check in the saved posts list
-    for (var post in home_screen.savedPosts) {
-      if (post.id == postId) {
-        return post;
-      }
-    }
-    
-    return null;
-  }
-  
-  /// Updates a post in both lists if it exists.
-  void updatePost(Post updatedPost) {
-    // Update in main posts list
-    final mainPostIndex = home_screen.posts.indexWhere((p) => p.id == updatedPost.id);
-    if (mainPostIndex != -1) {
-      home_screen.posts[mainPostIndex] = updatedPost;
-    }
-    
-    // Update in saved posts list
-    final savedPostIndex = home_screen.savedPosts.indexWhere((p) => p.id == updatedPost.id);
-    if (savedPostIndex != -1) {
-      home_screen.savedPosts[savedPostIndex] = updatedPost;
+      return Post.fromJson(response.data);
+    } catch (e) {
+      throw ApiErrorHandler.handleError(e);
     }
   }
 
-  void removeReply(String id, String id2, home_screen.Reply reply) {}
+  /// Gets posts with pagination
+  Future<List<Post>> getPosts({
+    int page = 1,
+    int limit = 10,
+    String? userId,
+  }) async {
+    try {
+      final response = await _dio.get(
+        '/posts',
+        queryParameters: {
+          'page': page,
+          'limit': limit,
+          if (userId != null) 'user_id': userId,
+        },
+      );
+      return (response.data['data'] as List)
+          .map((json) => Post.fromJson(json))
+          .toList();
+    } catch (e) {
+      throw ApiErrorHandler.handleError(e);
+    }
+  }
 
-  void addReply(String id, String id2, home_screen.Reply newReply) {}
+  /// Adds a comment to a post
+  Future<void> addComment(String postId, String content) async {
+    try {
+      await _dio.post(
+        '/posts/$postId/comments',
+        data: {'content': content},
+      );
+    } catch (e) {
+      throw ApiErrorHandler.handleError(e);
+    }
+  }
+
+  /// Removes a comment from a post
+  Future<void> removeComment(String postId, String commentId) async {
+    try {
+      await _dio.delete(
+        '/posts/$postId/comments/$commentId',
+      );
+    } catch (e) {
+      throw ApiErrorHandler.handleError(e);
+    }
+  }
+
+  /// Likes a post
+  Future<void> likePost(String postId) async {
+    try {
+      await _dio.post(
+        '/posts/$postId/likes',
+      );
+    } catch (e) {
+      throw ApiErrorHandler.handleError(e);
+    }
+  }
+
+  /// Unlikes a post
+  Future<void> unlikePost(String postId) async {
+    try {
+      await _dio.delete(
+        '/posts/$postId/likes',
+      );
+    } catch (e) {
+      throw ApiErrorHandler.handleError(e);
+    }
+  }
+
+  /// Gets a post by ID
+  Future<Post> getPostById(String postId) async {
+    try {
+      final response = await _dio.get('/posts/$postId');
+      return Post.fromJson(response.data);
+    } catch (e) {
+      throw ApiErrorHandler.handleError(e);
+    }
+  }
+
+  /// Saves a post
+  Future<void> savePost(String postId) async {
+    try {
+      await _dio.post(
+        '/posts/$postId/save',
+      );
+    } catch (e) {
+      throw ApiErrorHandler.handleError(e);
+    }
+  }
+
+  /// Unsave a post
+  Future<void> unsavePost(String postId) async {
+    try {
+      await _dio.delete(
+        '/posts/$postId/save',
+      );
+    } catch (e) {
+      throw ApiErrorHandler.handleError(e);
+    }
+  }
+
+  /// Gets saved posts
+  Future<List<Post>> getSavedPosts({
+    int page = 1,
+    int limit = 10,
+  }) async {
+    try {
+      final response = await _dio.get(
+        '/posts/saved',
+        queryParameters: {
+          'page': page,
+          'limit': limit,
+        },
+      );
+      return (response.data['data'] as List)
+          .map((json) => Post.fromJson(json))
+          .toList();
+    } catch (e) {
+      throw ApiErrorHandler.handleError(e);
+    }
+  }
+
+  /// Updates a post through the API
+  Future<void> updatePost(String postId, Map<String, dynamic> updates) async {
+    try {
+      await _dio.patch(
+        '/posts/$postId',
+        data: updates,
+      );
+    } catch (e) {
+      throw ApiErrorHandler.handleError(e);
+    }
+  }
+
+  /// Removes a reply from a comment
+  Future<void> removeReply(String commentId, String replyId) async {
+    try {
+      await _dio.delete(
+        '/comments/$commentId/replies/$replyId',
+      );
+    } catch (e) {
+      throw ApiErrorHandler.handleError(e);
+    }
+  }
+
+  /// Adds a reply to a comment
+  Future<void> addReply(String commentId, String content) async {
+    try {
+      await _dio.post(
+        '/comments/$commentId/replies',
+        data: {
+          'content': content,
+        },
+      );
+    } catch (e) {
+      throw ApiErrorHandler.handleError(e);
+    }
+  }
 }

@@ -1,17 +1,14 @@
+import 'package:ether_app/screens/home_screen.dart';
 import 'package:flutter/material.dart';
 import 'dart:io';
-import 'home_screen.dart';
+import 'package:provider/provider.dart';
+import '../providers/story_provider.dart';
+import '../models/story.dart';
+import '../models/user.dart';
 import 'dart:async';
 
 class StoryViewerScreen extends StatefulWidget {
-  final List<UserStory> userStories;
-  final int initialUserIndex;
-
-  const StoryViewerScreen({
-    super.key,
-    required this.userStories,
-    required this.initialUserIndex,
-  });
+  const StoryViewerScreen({super.key, required List<UserStory> userStories, required int initialUserIndex});
 
   @override
   State<StoryViewerScreen> createState() => _StoryViewerScreenState();
@@ -20,7 +17,7 @@ class StoryViewerScreen extends StatefulWidget {
 class _StoryViewerScreenState extends State<StoryViewerScreen> {
   late int userIndex;
   late int storyIndex;
-  final Color primaryPurple = const Color.fromRGBO(148, 15, 252, 1);
+  late final Color primaryPurple;
   List<List<bool>> likedStories = [];
   Timer? _timer;
   double _progress = 0.0;
@@ -30,12 +27,21 @@ class _StoryViewerScreenState extends State<StoryViewerScreen> {
   @override
   void initState() {
     super.initState();
-    userIndex = widget.initialUserIndex;
-    storyIndex = 0;
-    likedStories = widget.userStories
-        .map((userStory) => List.generate(userStory.stories.length, (_) => false))
-        .toList();
-    _startTimer();
+    primaryPurple = Provider.of<AuthProvider>(context, listen: false).appConfig?.primaryColor ?? const Color.fromRGBO(148, 15, 252, 1);
+    _loadStories();
+  }
+
+  Future<void> _loadStories() async {
+    final storyProvider = Provider.of<StoryProvider>(context, listen: false);
+    final stories = await storyProvider.loadStories();
+    setState(() {
+      userIndex = 0;
+      storyIndex = 0;
+      likedStories = stories
+          .map((userStory) => List.generate(userStory.stories.length, (_) => false))
+          .toList();
+      _startTimer();
+    });
   }
 
   void _startTimer() {
@@ -56,10 +62,10 @@ class _StoryViewerScreenState extends State<StoryViewerScreen> {
   void _nextStory() {
     _timer?.cancel();
     setState(() {
-      if (storyIndex < widget.userStories[userIndex].stories.length - 1) {
+      if (storyIndex < Provider.of<StoryProvider>(context, listen: false).userStories[userIndex].stories.length - 1) {
         storyIndex++;
         _startTimer();
-      } else if (userIndex < widget.userStories.length - 1) {
+      } else if (userIndex < Provider.of<StoryProvider>(context, listen: false).userStories.length - 1) {
         userIndex++;
         storyIndex = 0;
         _startTimer();
@@ -77,30 +83,47 @@ class _StoryViewerScreenState extends State<StoryViewerScreen> {
         _startTimer();
       } else if (userIndex > 0) {
         userIndex--;
-        storyIndex = widget.userStories[userIndex].stories.length - 1;
+        storyIndex = Provider.of<StoryProvider>(context, listen: false).userStories[userIndex].stories.length - 1;
         _startTimer();
       }
     });
   }
 
-  void _deleteCurrentStory() {
-    setState(() {
-      widget.userStories[userIndex].stories.removeAt(storyIndex);
-      likedStories[userIndex].removeAt(storyIndex);
-      if (widget.userStories[userIndex].stories.isEmpty) {
-        widget.userStories.removeAt(userIndex);
-        likedStories.removeAt(userIndex);
-        if (widget.userStories.isEmpty) {
-          Navigator.pop(context);
-          return;
-        }
-        if (userIndex > 0) userIndex--;
-        storyIndex = 0;
-      } else if (storyIndex >= widget.userStories[userIndex].stories.length) {
-        storyIndex = widget.userStories[userIndex].stories.length - 1;
+  Future<void> _deleteCurrentStory() async {
+    try {
+      final storyProvider = Provider.of<StoryProvider>(context, listen: false);
+      await storyProvider.deleteStory(
+        userId: Provider.of<StoryProvider>(context, listen: false).userStories[userIndex].userId,
+        storyId: Provider.of<StoryProvider>(context, listen: false).userStories[userIndex].stories[storyIndex].id,
+      );
+      if (mounted) {
+        setState(() {
+          Provider.of<StoryProvider>(context, listen: false).userStories[userIndex].stories.removeAt(storyIndex);
+          likedStories[userIndex].removeAt(storyIndex);
+          if (Provider.of<StoryProvider>(context, listen: false).userStories[userIndex].stories.isEmpty) {
+            Provider.of<StoryProvider>(context, listen: false).userStories.removeAt(userIndex);
+            likedStories.removeAt(userIndex);
+            if (Provider.of<StoryProvider>(context, listen: false).userStories.isEmpty) {
+              Navigator.pop(context);
+              return;
+            }
+            if (userIndex > 0) userIndex--;
+            storyIndex = 0;
+          } else if (storyIndex >= Provider.of<StoryProvider>(context, listen: false).userStories[userIndex].stories.length) {
+            storyIndex = Provider.of<StoryProvider>(context, listen: false).userStories[userIndex].stories.length - 1;
+          }
+        });
       }
-      _startTimer();
-    });
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Failed to delete story'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   @override

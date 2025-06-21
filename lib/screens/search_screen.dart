@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'dart:io'; // For File class
-import 'home_screen.dart'; // To access posts and users
+import 'package:provider/provider.dart';
+import '../providers/user_provider.dart';
+import '../models/user.dart';
 
 class SearchScreen extends StatefulWidget {
   const SearchScreen({super.key});
@@ -15,79 +17,10 @@ class _SearchScreenState extends State<SearchScreen> with SingleTickerProviderSt
   late TabController _tabController;
   String _searchQuery = '';
   
-  // List of people to search through (combining users from posts and stories)
-  final List<Map<String, dynamic>> _people = [
-    {
-      'username': 'Feky',
-      'userImage': 'assets/user3.png',
-      'userHandle': '@Feky',
-      'bio': 'Photographer and travel enthusiast',
-      'isFollowing': true,
-    },
-    {
-      'username': 'Sheta',
-      'userImage': 'assets/user4.png',
-      'userHandle': '@Sheta',
-      'bio': 'Digital artist | Music lover',
-      'isFollowing': true,
-    },
-    {
-      'username': 'Mona',
-      'userImage': null,
-      'userHandle': '@mona',
-      'bio': 'Food blogger and cooking enthusiast',
-      'isFollowing': false,
-    },
-    {
-      'username': 'Karim',
-      'userImage': null,
-      'userHandle': '@karim',
-      'bio': 'Tech geek | Software developer',
-      'isFollowing': false,
-    },
-    {
-      'username': 'Sara',
-      'userImage': null,
-      'userHandle': '@sara',
-      'bio': 'Fitness instructor | Healthy lifestyle',
-      'isFollowing': false,
-    },
-    {
-      'username': 'Omar',
-      'userImage': null,
-      'userHandle': '@omar',
-      'bio': 'Travel vlogger | Adventure seeker',
-      'isFollowing': false,
-    },
-    {
-      'username': 'Layla',
-      'userImage': null,
-      'userHandle': '@layla',
-      'bio': 'Fashion designer | Style enthusiast',
-      'isFollowing': false,
-    },
-    {
-      'username': 'Youssef',
-      'userImage': null,
-      'userHandle': '@youssef',
-      'bio': 'Music producer | Guitar player',
-      'isFollowing': false,
-    },
-    {
-      'username': 'Nour',
-      'userImage': null,
-      'userHandle': '@nour',
-      'bio': 'Book lover | Coffee addict',
-      'isFollowing': false,
-    },
-    {
-      'username': 'Hany',
-      'userImage': null,
-      'userHandle': '@hany',
-      'bio': 'Sports fan | Basketball player',
-      'isFollowing': false,
-    },
-  ];
+  List<User> _searchResults = [];
+  bool _isLoading = false;
+  bool _hasMore = true;
+  int _currentPage = 1;
 
   @override
   void initState() {
@@ -95,9 +28,45 @@ class _SearchScreenState extends State<SearchScreen> with SingleTickerProviderSt
     _tabController = TabController(length: 2, vsync: this);
     _searchController.addListener(_onSearchChanged);
   }
+
+  Future<void> _searchUsers() async {
+    if (_isLoading || _searchQuery.isEmpty) return;
+
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      final userProvider = Provider.of<UserProvider>(context, listen: false);
+      final results = await userProvider.searchUsers(_searchQuery, _currentPage);
+      setState(() {
+        if (_currentPage == 1) {
+          _searchResults = results;
+        } else {
+          _searchResults.addAll(results);
+        }
+        _hasMore = results.length >= 10; // Assuming API returns 10 results per page
+        _currentPage++;
+      });
+    } catch (e) {
+      // Handle error
+      print('Error searching users: $e');
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
   
   void _onSearchChanged() {
-    setState(() {
+    if (_searchController.text != _searchQuery) {
+      setState(() {
+        _searchQuery = _searchController.text;
+        _currentPage = 1;
+        _searchResults.clear();
+        _searchUsers();
+      });
+    }
       _searchQuery = _searchController.text.toLowerCase();
     });
   }
@@ -241,80 +210,59 @@ class _SearchScreenState extends State<SearchScreen> with SingleTickerProviderSt
                 color: Colors.black.withOpacity(0.05),
                 blurRadius: 4,
                 offset: const Offset(0, 2),
-              ),
-            ],
-          ),
           child: Row(
             children: [
-              // User image or placeholder
-              person['userImage'] != null
-                  ? CircleAvatar(
-                      radius: 30,
-                      backgroundImage: AssetImage(person['userImage']),
-                    )
-                  : CircleAvatar(
-                      radius: 30,
-                      backgroundColor: Colors.grey[300],
-                      child: Text(
-                        person['username'][0],
-                        style: const TextStyle(
-                          color: Colors.black54,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 20,
-                        ),
-                      ),
-                    ),
-              const SizedBox(width: 16),
-              
-              // User info
+              CircleAvatar(
+                backgroundImage: user.profilePictureUrl != null
+                    ? NetworkImage(user.profilePictureUrl!)
+                    : null,
+                radius: 24,
+              ),
+              const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      person['username'],
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      person['userHandle'],
-                      style: TextStyle(
-                        color: Colors.grey[600],
-                        fontSize: 14,
-                      ),
+                    Row(
+                      children: [
+                        Text(
+                          user.username,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          '@${user.username}',
+                          style: const TextStyle(
+                            color: Colors.black54,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      person['bio'],
-                      style: TextStyle(
-                        color: Colors.grey[800],
+                      user.bio ?? '',
+                      style: const TextStyle(
+                        color: Colors.black54,
                         fontSize: 14,
                       ),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
                     ),
                   ],
                 ),
               ),
-              
-              // Follow/Following button
-              ElevatedButton(
+              IconButton(
+                icon: Icon(
+                  user.isFollowing ? Icons.person_remove : Icons.person_add,
+                  color: user.isFollowing ? Colors.red : primaryPurple,
+                ),
                 onPressed: () {
-                  setState(() {
-                    // Toggle following status
-                    person['isFollowing'] = !person['isFollowing'];
-                  });
+                  // Handle follow/unfollow
+                  final userProvider = Provider.of<UserProvider>(context, listen: false);
+                  userProvider.toggleFollow(user.id);
                 },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: person['isFollowing'] ? Colors.grey[300] : primaryPurple,
-                  foregroundColor: person['isFollowing'] ? Colors.black87 : Colors.white,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 ),
                 child: Text(person['isFollowing'] ? 'Following' : 'Follow'),
               ),
